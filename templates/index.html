@@ -1,0 +1,173 @@
+{{block "index" .}}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTMX Todo App</title>
+    <script src="https://unpkg.com/htmx.org"></script>
+    <style>
+        body {
+            background-color: #333138;
+            color: #FFFFFA;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .todo-table {
+            max-width: 800px;
+            min-width: 600px;
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px;
+            overflow-wrap: break-word;
+        }
+
+        .todo-item {
+            background-color: #515052;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+            overflow-wrap: break-word;
+        }
+
+        .todo-item td {
+            padding: 10px;
+            color: #FFFFFA;
+            word-break: break-word;
+        }
+
+        .center-button {
+            text-align: center;
+        }
+
+        .expand-column {
+            width: 100%;
+        }
+
+        .todo-item button {
+            background-color: #FF312E;
+            border: none;
+            color: #FFFFFA;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 2px 2px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+            word-break: normal;
+        }
+
+        .todo-item button:hover {
+            background-color: #000103;
+        }
+
+        .todo-item input[type="checkbox"] + label {
+            position: relative;
+            padding-left: 35px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        form input {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        form button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #FF312E;
+            color: #FFFFFA;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        form button:hover {
+            background-color: #000103;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="todo-list">
+        {{template "todo-list" .}}
+
+        <script>
+            document.body.addEventListener('htmx:afterSwap', function(evt) {
+                const form = document.querySelector("#add-todo");
+                form.reset();
+            });
+        </script>
+        <form hx-post="/todo" hx-swap="beforeend" hx-target="#todo-table-body" id="add-todo">
+            <input type="text" name="name" placeholder="Add new todo">
+            <button type="submit">Add</button>
+        </form>
+    </div>
+</body>
+
+</html>
+{{end}}
+
+{{block "todo" .}}
+<tr class="todo-item" id="todo{{.ID}}">
+    <td class="center-button">
+        <input
+            type="checkbox"
+            hx-put="/todo/complete?id={{.ID}}"
+            hx-trigger="change"
+            hx-target="#todo{{.ID}}"
+            hx-swap="outerHTML"
+            {{if .Completed}}checked{{end}}
+        >
+    </td>
+    <td {{if .Completed}}style="text-decoration: line-through"{{end}} class="expand-column">{{.Name}}</td>
+    <td class="center-button">
+        <button
+            hx-delete="/todo?id={{.ID}}"
+            hx-target="#todo{{.ID}}"
+            hx-swap="outerHTML"
+        >
+            Delete
+        </button>
+    </td>
+</tr>
+{{end}}
+
+{{block "todo-list" .}}
+<table class="todo-table">
+    <thead>
+    <tr>
+        <th>Todo</th>
+    </tr>
+    </thead>
+    <tbody id="todo-table-body">
+    {{range .}}
+    {{template "todo" .}}
+    {{end}}
+    </tbody>
+</table>
+{{end}}
+
+{{block "error" .}}
+<h1>{{.StatusCode}}: {{.Status}}</h1>
+<p>{{.Message}}</p>
+{{end}}
