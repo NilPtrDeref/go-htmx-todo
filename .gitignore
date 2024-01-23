@@ -1,2 +1,4 @@
 todos.db
 .idea
+tmp
+**_templ.go

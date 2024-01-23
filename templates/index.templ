@@ -1,10 +1,17 @@
-{{block "index" .}}
+package templates
+
+import (
+    "fmt"
+    . "todo/models"
+)
+
+templ Index(todos []Todo) {
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>HTMX Todo App</title>
     <script src="https://unpkg.com/htmx.org"></script>
     <style>
@@ -108,51 +115,57 @@
 </head>
 
 <body>
-    <div id="todo-list">
-        {{template "todo-list" .}}
+<div id="todo-list">
+    @TodoList(todos)
 
-        <script>
-            document.body.addEventListener('htmx:afterSwap', function(evt) {
-                const form = document.querySelector("#add-todo");
-                form.reset();
-            });
-        </script>
-        <form hx-post="/todo" hx-swap="beforeend" hx-target="#todo-table-body" id="add-todo">
-            <input type="text" name="name" placeholder="Add new todo">
-            <button type="submit">Add</button>
-        </form>
-    </div>
+    <script>
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            const form = document.querySelector("#add-todo");
+            form.reset();
+        });
+    </script>
+    <form hx-post="/todo" hx-swap="beforeend" hx-target="#todo-table-body" id="add-todo">
+        <input type="text" name="name" placeholder="Add new todo"/>
+        <button type="submit">Add</button>
+    </form>
+</div>
 </body>
 
 </html>
-{{end}}
+}
 
-{{block "todo" .}}
-<tr class="todo-item" id="todo{{.ID}}">
+templ TodoItem(todo Todo) {
+<tr class="todo-item" id={fmt.Sprintf("todo-%d", todo.ID)}>
     <td class="center-button">
         <input
             type="checkbox"
-            hx-put="/todo/complete?id={{.ID}}"
+            hx-put={fmt.Sprintf("/todo/complete?id=%d", todo.ID)}
             hx-trigger="change"
-            hx-target="#todo{{.ID}}"
+            hx-target={fmt.Sprintf("#todo-%d", todo.ID)}
             hx-swap="outerHTML"
-            {{if .Completed}}checked{{end}}
-        >
+            if todo.Completed {
+                checked="true"
+            }
+        />
     </td>
-    <td {{if .Completed}}style="text-decoration: line-through"{{end}} class="expand-column">{{.Name}}</td>
+    <td
+        if todo.Completed {
+            style="text-decoration: line-through"
+        }
+        class="expand-column">{todo.Name}</td>
     <td class="center-button">
         <button
-            hx-delete="/todo?id={{.ID}}"
-            hx-target="#todo{{.ID}}"
+            hx-delete={fmt.Sprintf("/todo?id=%d", todo.ID)}
+            hx-target={fmt.Sprintf("#todo-%d", todo.ID)}
             hx-swap="outerHTML"
         >
             Delete
         </button>
     </td>
 </tr>
-{{end}}
+}
 
-{{block "todo-list" .}}
+templ TodoList(todos []Todo) {
 <table class="todo-table">
     <thead>
     <tr>
@@ -160,14 +173,14 @@
     </tr>
     </thead>
     <tbody id="todo-table-body">
-    {{range .}}
-    {{template "todo" .}}
-    {{end}}
+    for _, todo := range todos {
+        @TodoItem(todo)
+    }
     </tbody>
 </table>
-{{end}}
+}
 
-{{block "error" .}}
-<h1>{{.StatusCode}}: {{.Status}}</h1>
-<p>{{.Message}}</p>
-{{end}}
+templ ErrorMessage(err Error) {
+<h1>{fmt.Sprintf("%d", err.StatusCode)}: {err.Status}</h1>
+<p>{err.Message}</p>
+}

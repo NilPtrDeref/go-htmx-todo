@@ -1,33 +1,18 @@
 package main
 
 import (
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
-	"html/template"
 	"net/http"
 	"time"
+	. "todo/models"
+	"todo/templates"
 )
 
-type Todo struct {
-	ID        int       `db:"id"`
-	Name      string    `db:"name"`
-	Completed bool      `db:"completed"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-}
-
-type Error struct {
-	StatusCode int
-	Status     string
-	Message    string
-}
-
 func main() {
-	tmpl := template.Must(template.ParseFiles("templates/index.html"))
-
 	// Create sqlx sqlite3 connection
 	db, err := sqlx.Open("sqlite3", "todos.db")
 	if err != nil {
@@ -37,11 +22,11 @@ func main() {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 
-	router.Get("/", Index(tmpl, db))
-	router.Post("/todo", CreateTodo(tmpl, db))
-	router.Get("/todo", GetTodos(tmpl, db))
-	router.Put("/todo/complete", ToggleComplete(tmpl, db))
-	router.Delete("/todo", DeleteTodo(tmpl, db))
+	router.Get("/", Index(db))
+	router.Post("/todo", CreateTodo(db))
+	router.Get("/todo", GetTodos(db))
+	router.Put("/todo/complete", ToggleComplete(db))
+	router.Delete("/todo", DeleteTodo(db))
 
 	server := http.Server{
 		Addr:         ":8080",
@@ -53,7 +38,7 @@ func main() {
 	logrus.Fatal(server.ListenAndServe())
 }
 
-func Index(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
+func Index(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var todos []Todo
 		err := db.Select(&todos, `
@@ -65,34 +50,36 @@ func Index(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 500,
 				Status:     "Internal Server Error",
 				Message:    err.Error(),
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
 		}
 
-		if err := tmpl.ExecuteTemplate(w, "index", todos); err != nil {
+		if err := templates.Index(todos).Render(r.Context(), w); err != nil {
 			logrus.WithError(err).Error("error executing template")
 		}
 	}
 }
 
-func CreateTodo(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
+func CreateTodo(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PostFormValue("name")
 		if name == "" {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 400,
 				Status:     "Bad Request",
 				Message:    "name is required",
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
@@ -110,30 +97,32 @@ func CreateTodo(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 500,
 				Status:     "Internal Server Error",
 				Message:    err.Error(),
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := tmpl.ExecuteTemplate(w, "todo", Todo{
+		err = templates.TodoItem(Todo{
 			ID:        id,
 			Name:      name,
 			Completed: false,
 			CreatedAt: now,
 			UpdatedAt: now,
-		}); err != nil {
+		}).Render(r.Context(), w)
+		if err != nil {
 			logrus.WithError(err).Error("error executing template")
 		}
 	}
 }
 
-func GetTodos(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
+func GetTodos(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var todos []Todo
 		err := db.Select(&todos, `
@@ -145,34 +134,36 @@ func GetTodos(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 500,
 				Status:     "Internal Server Error",
 				Message:    err.Error(),
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
 		}
 
-		if err := tmpl.ExecuteTemplate(w, "todo-list", todos); err != nil {
+		if err := templates.TodoList(todos).Render(r.Context(), w); err != nil {
 			logrus.WithError(err).Error("error executing template")
 		}
 	}
 }
 
-func ToggleComplete(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
+func ToggleComplete(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.FormValue("id")
 		if id == "" {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 400,
 				Status:     "Bad Request",
 				Message:    "id is required",
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
@@ -188,35 +179,37 @@ func ToggleComplete(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 500,
 				Status:     "Internal Server Error",
 				Message:    err.Error(),
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		if err := tmpl.ExecuteTemplate(w, "todo", todo); err != nil {
+		if err := templates.TodoItem(todo).Render(r.Context(), w); err != nil {
 			logrus.WithError(err).Error("error executing template")
 		}
 	}
 }
 
-func DeleteTodo(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
+func DeleteTodo(db *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.FormValue("id")
 		if id == "" {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 400,
 				Status:     "Bad Request",
 				Message:    "id is required",
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
@@ -229,11 +222,12 @@ func DeleteTodo(tmpl *template.Template, db *sqlx.DB) http.HandlerFunc {
 			w.Header().Set("HX-Retarget", "#todo-list")
 			w.Header().Set("HX-Reswap", "outerHTML")
 			w.WriteHeader(http.StatusOK)
-			if err := tmpl.ExecuteTemplate(w, "error", Error{
+			err := templates.ErrorMessage(Error{
 				StatusCode: 500,
 				Status:     "Internal Server Error",
 				Message:    err.Error(),
-			}); err != nil {
+			}).Render(r.Context(), w)
+			if err != nil {
 				logrus.WithError(err).Error("error executing template")
 			}
 			return
